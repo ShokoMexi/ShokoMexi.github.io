@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF-Bearbeitung Webseite</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 20px;
+        }
+
+        #pdfViewer {
+            border: 1px solid #ccc;
+            width: 90%;
+            height: 600px;
+            overflow: auto;
+            margin-top: 20px;
+        }
+
+        #canvas {
+            border: 1px solid #000;
+            cursor: crosshair;
+        }
+
+        #controls {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>PDF Hochladen und Bearbeiten</h1>
+    <input type="file" id="fileInput" accept=".pdf">
+    <div id="controls">
+        <button id="clearButton">Zeichnung löschen</button>
+        <button id="downloadButton">PDF herunterladen</button>
+    </div>
+    <div id="pdfViewer">
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const clearButton = document.getElementById('clearButton');
+        const downloadButton = document.getElementById('downloadButton');
+
+        let pdfDoc = null;
+        let currentPage = 1;
+        let isDrawing = false;
+
+        // PDF-Datei hochladen und anzeigen
+        fileInput.addEventListener('change', async (event) => {
+            const file = event.target.files[0];
+            if (file && file.type === 'application/pdf') {
+                const fileReader = new FileReader();
+                fileReader.onload = async function () {
+                    const typedArray = new Uint8Array(this.result);
+                    pdfDoc = await PDFLib.PDFDocument.load(typedArray);
+                    renderPage(currentPage);
+                };
+                fileReader.readAsArrayBuffer(file);
+            }
+        });
+
+        // Seite rendern
+        async function renderPage(pageNumber) {
+            if (pdfDoc) {
+                const page = pdfDoc.getPages()[pageNumber - 1];
+                const { width, height } = page.getSize();
+                canvas.width = width;
+                canvas.height = height;
+                const pdfPage = await page.renderToCanvas(canvas);
+            }
+        }
+
+        // Zeichnen aktivieren
+        canvas.addEventListener('mousedown', () => {
+            isDrawing = true;
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDrawing = false;
+            ctx.beginPath();
+        });
+
+        canvas.addEventListener('mousemove', (event) => {
+            if (isDrawing) {
+                const rect = canvas.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+                ctx.lineTo(x, y);
+                ctx.stroke();
+            }
+        });
+
+        // Zeichnung löschen
+        clearButton.addEventListener('click', () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        });
+
+        // PDF herunterladen
+        downloadButton.addEventListener('click', async () => {
+            if (pdfDoc) {
+                const pdfBytes = await pdfDoc.save();
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'bearbeitet.pdf';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+        });
+    </script>
+</body>
+</html>
